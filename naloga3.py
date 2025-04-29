@@ -60,6 +60,34 @@ def meanshift(slika, velikost_okna, dimenzija):
 
 def izracunaj_centre(slika, izbira, dimenzija_centra, T):
     '''Izračuna centre za metodo kmeans.'''
+    #Prebere dimenzije slike in pripracimo vektor
+    M, N, C = slika.shape
+    pixels = slika.reshape(-1, C).astype(float)  
+
+    #Ce je dimenzija_centra = 3, upostevamo barvo, ce ne potem upostevamo lokacije centrov in barve
+    if(dimenzija_centra == 3):
+        #Samo barve (M*N, C)
+        oznake = pixels
+    else:
+        #Izracunamo x in y za vsak piksel
+        #Oznaka za vsako vrsto od 0 do M*N-1
+        idx = np.arange(pixels.shape[0])
+
+        #Stolpec, 
+        x = idx % N
+
+        #Vrsica, 
+        y = idx // N
+
+        coords = np.stack([x, y], axis=1).astype(float)
+        features = np.hstack(pixels, coords)
+
+    #Stevilo centrov
+    k = dimenzija_centra
+    #Seznam za shranjevanje centrov
+    centri = []
+    
+
     pass
 
 if __name__ == "__main__":
