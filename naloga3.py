@@ -54,9 +54,19 @@ def kmeans(slika, k=3, iteracije=10):
     slika_out = out.reshape(M, N, 3).astype(np.uint8)
     return slika_out
 
+#Funkcija za izracun razdalje med dvema tockama
+def izracunaj_razdaljo(x, oznake):
+    #Izracuna in vrne razdalje med tocko x in vsako tocko v oznakah
+    return np.linalg.norm(oznake - x, axis=1)
+
 #Funkcija za izracun gaussovega jedra
 def gaussovo_jedro(d, h):
     return np.exp(-(pow(d, 2) / (2 * pow(h, 2))))
+
+#Funkcija za preverjanje konvergence
+def preveri_konvergenco(x_new, x, eps):
+    #Preveri, ce je premik tocke manj kot eps
+    return np.linalg.norm(x_new - x) < eps
 
 def meanshift(slika, velikost_okna, dimenzija):
     '''Izvede segmentacijo slike z uporabo metode mean-shift.'''
@@ -64,7 +74,6 @@ def meanshift(slika, velikost_okna, dimenzija):
     max_iter = 10   #Max iteracij za vsak piksel
     eps = 1e-3      #Prag za konvergenco
     min_cs = 10.0   #Pogoj za zdruzevanje centrov
-
 
     #Prebere dimenzije slike in pripravimo vektor
     M, N, C = slika.shape
@@ -88,6 +97,32 @@ def meanshift(slika, velikost_okna, dimenzija):
         coords = np.stack([x, y], axis=1).astype(float)
         oznake = np.hstack(pixels, coords)
 
+    #Za vsak piksel v vektorju oznake
+    for i in range(len(oznake)):
+        x = oznake[i]
+        iteracija = 0
+        konvergenca = False
+        while not konvergenca and iteracija < max_iter:
+            #Izracun razdalj
+            razdalje = izracunaj_razdaljo(x, oznake)
+
+            #Utezi z jedrom
+            utezi = gaussovo_jedro(razdalje, velikost_okna)
+
+            #Nova tocka sum(utezi * tocke) / sum(utezi)
+            x_new = np.zeros_like(x)
+            for d in range(len(x)):
+                sum = 0.0
+                for j in range(len(oznake)):
+                    sum += utezi[j] * oznake[j][d]
+                x_new[d] = sum / sum(utezi)
+            
+            #Preveri konvergenco med tockami
+            preveri_konvergenco(x_new, x, eps)
+            x = x_new
+            iteracija += 1
+
+            preveri_konvergenco
 
     pass
 
