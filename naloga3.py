@@ -54,17 +54,50 @@ def kmeans(slika, k=3, iteracije=10):
     slika_out = out.reshape(M, N, 3).astype(np.uint8)
     return slika_out
 
+#Funkcija za izracun gaussovega jedra
+def gaussovo_jedro(d, h):
+    return np.exp(-(pow(d, 2) / (2 * pow(h, 2))))
+
 def meanshift(slika, velikost_okna, dimenzija):
     '''Izvede segmentacijo slike z uporabo metode mean-shift.'''
+    #Parametri
+    max_iter = 10   #Max iteracij za vsak piksel
+    eps = 1e-3      #Prag za konvergenco
+    min_cs = 10.0   #Pogoj za zdruzevanje centrov
+
+
+    #Prebere dimenzije slike in pripravimo vektor
+    M, N, C = slika.shape
+    pixels = slika.reshape(-1, C).astype(float)     # (h*w, c)
+
+    #Ce je dimenzija = 3, upostevamo samo barvo, ce ne potem upostevamo lokacije centrov in barve
+    if(dimenzija == 3):
+        #Samo barve (M*N, C)
+        oznake = pixels
+    else:
+        #Izracunamo x in y za vsak piksel
+        #Oznaka za vsako vrsto od 0 do M*N-1
+        idx = np.arange(pixels.shape[0])
+
+        #Stolpec, 
+        x = idx % N
+
+        #Vrsica, 
+        y = idx // N
+
+        coords = np.stack([x, y], axis=1).astype(float)
+        oznake = np.hstack(pixels, coords)
+
+
     pass
 
 def izracunaj_centre(slika, izbira, dimenzija_centra, T):
     '''Izračuna centre za metodo kmeans.'''
-    #Prebere dimenzije slike in pripracimo vektor
+    #Prebere dimenzije slike in pripravimo vektor
     M, N, C = slika.shape
     pixels = slika.reshape(-1, C).astype(float)  
 
-    #Ce je dimenzija_centra = 3, upostevamo barvo, ce ne potem upostevamo lokacije centrov in barve
+    #Ce je dimenzija_centra = 3, upostevamo samo barvo, ce ne potem upostevamo lokacije centrov in barve
     if(dimenzija_centra == 3):
         #Samo barve (M*N, C)
         oznake = pixels
