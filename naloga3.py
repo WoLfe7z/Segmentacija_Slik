@@ -13,8 +13,17 @@ def kmeans(slika, k=3, iteracije=10):
     #Oznaka klastra za vsak piksel
     oznake = np.zeros(st_pix, dtype=int)
 
+    dimenzija = 3
+    izbira = 0
     #Izracunanje centrov
-    centri = izracunaj_centre(slika, 1, k, 50.0)
+    centri = izracunaj_centre(slika, izbira, dimenzija, 50.0)
+
+    if(dimenzija == 5):
+        idx = np.arange(pixels.shape[0])
+        x = idx % N
+        y = idx // N
+        coords = np.stack([x, y], axis=1).astype(float)
+        pixels = np.hstack((pixels, coords))
 
     #Iteracija K-Means
     for it in range(iteracije): 
@@ -51,7 +60,7 @@ def kmeans(slika, k=3, iteracije=10):
     
     #Rekonstrukcija slike
     out = centri[oznake]
-    slika_out = out.reshape(M, N, 3).astype(np.uint8)
+    slika_out = out[:, :3].reshape(M, N, 3).astype(np.uint8)
     return slika_out
 
 #Funkcija za izracun razdalje med dvema tockama
@@ -71,7 +80,7 @@ def preveri_konvergenco(x_new, x, eps):
 def meanshift(slika, velikost_okna, dimenzija):
     '''Izvede segmentacijo slike z uporabo metode mean-shift.'''
     #Parametri
-    max_iter = 10   #Max iteracij za vsak piksel
+    max_iter = 5    #Max iteracij za vsak piksel
     eps = 1e-3      #Prag za konvergenco
     min_cd = 10.0   #Pogoj za zdruzevanje centrov
 
@@ -95,9 +104,9 @@ def meanshift(slika, velikost_okna, dimenzija):
         y = idx // N
 
         coords = np.stack([x, y], axis=1).astype(float)
-        oznake = np.hstack(pixels, coords)
+        oznake = np.hstack((pixels, coords))
 
-    shifted  =np.zeros_like(oznake)
+    shifted = np.zeros_like(oznake)
     #Za vsak piksel v vektorju oznake
     for i in range(len(oznake)):
         x = oznake[i]
@@ -111,17 +120,13 @@ def meanshift(slika, velikost_okna, dimenzija):
             utezi = gaussovo_jedro(razdalje, velikost_okna)
 
             #Nova tocka sum(utezi * tocke) / sum(utezi)
-            x_new = np.zeros_like(x)
-            for d in range(len(x)):
-                sum = 0.0
-                for j in range(len(oznake)):
-                    sum += utezi[j] * oznake[j][d]
-                x_new[d] = sum / sum(utezi)
-            
+            x_new = (utezi[:, None] * oznake).sum(axis=0) / utezi.sum()
+
             #Preveri konvergenco med tockami
-            preveri_konvergenco(x_new, x, eps)
+            konvergenca = preveri_konvergenco(x_new, x, eps)
             x = x_new
             iteracija += 1
+        shifted[i] = x
 
     #Zdruzi konvergirane tocke v centre
     centri = []
@@ -141,7 +146,9 @@ def meanshift(slika, velikost_okna, dimenzija):
         dc = izracunaj_razdaljo(shifted[i], centri)
         labels[i] = np.argmin(dc)
 
-    out = centri[labels, C].reshape(M, N, C).astype(np.uint8)
+    seg_pixels = centri[labels]
+    seg_pixels = seg_pixels.reshape(M, N, centri.shape[1])
+    out = seg_pixels[:, :, :C].astype(np.uint8)
     return out
 
 def izracunaj_centre(slika, izbira, dimenzija_centra, T):
@@ -166,7 +173,7 @@ def izracunaj_centre(slika, izbira, dimenzija_centra, T):
         y = idx // N
 
         coords = np.stack([x, y], axis=1).astype(float)
-        oznake = np.hstack(pixels, coords)
+        oznake = np.hstack((pixels, coords))
 
     #Stevilo centrov
     k = dimenzija_centra
@@ -182,6 +189,7 @@ def izracunaj_centre(slika, izbira, dimenzija_centra, T):
         #Nato izbiramo dokler nimamo k centrov
         while len(centri) < k:
             idx = np.random.randint(len(oznake))
+            print(idx)
             #Random novi center
             nov = oznake[idx]
             #Racunanje razdalje do vseh izbranih centrov
@@ -228,12 +236,15 @@ def izracunaj_centre(slika, izbira, dimenzija_centra, T):
 
 if __name__ == "__main__":
     slika = cv.imread('.utils/zelenjava.jpg')
+    slika = cv.resize(slika, (800, 800))
 
-    #kmeans_alg = kmeans(slika, k=3, iteracije=10)
-    #cv.imshow('kmeans', kmeans_alg)
+    kmeans_alg = kmeans(slika, k=3, iteracije=10)
+    cv.imshow('kmeans', kmeans_alg)
 
-    meanshift_alg = meanshift(slika, 30.0, 3)
-    cv.imshow('mean-shift', meanshift_alg)
+    #meanshift_alg = meanshift(slika, 80.0, 3)
+    #cv.imshow('mean-shift', meanshift_alg)
+    #cv.imshow('slika', slika)
+
     cv.waitKey(0)
     cv.destroyAllWindows()
     pass
