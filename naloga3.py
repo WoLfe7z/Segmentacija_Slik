@@ -73,7 +73,7 @@ def meanshift(slika, velikost_okna, dimenzija):
     #Parametri
     max_iter = 10   #Max iteracij za vsak piksel
     eps = 1e-3      #Prag za konvergenco
-    min_cs = 10.0   #Pogoj za zdruzevanje centrov
+    min_cd = 10.0   #Pogoj za zdruzevanje centrov
 
     #Prebere dimenzije slike in pripravimo vektor
     M, N, C = slika.shape
@@ -97,6 +97,7 @@ def meanshift(slika, velikost_okna, dimenzija):
         coords = np.stack([x, y], axis=1).astype(float)
         oznake = np.hstack(pixels, coords)
 
+    shifted  =np.zeros_like(oznake)
     #Za vsak piksel v vektorju oznake
     for i in range(len(oznake)):
         x = oznake[i]
@@ -122,9 +123,26 @@ def meanshift(slika, velikost_okna, dimenzija):
             x = x_new
             iteracija += 1
 
-            preveri_konvergenco
+    #Zdruzi konvergirane tocke v centre
+    centri = []
+    for x in shifted:
+        if not centri:
+            centri.append(x)
+        else:
+            dc = izracunaj_razdaljo(x, np.array(centri))
+            if min(dc) >= min_cd:
+                centri.append(x)
+    
+    centri = np.array(centri)
 
-    pass
+    #Dodeli vsako tocko shifted tocku najblizjemu centru
+    labels = np.zeros(len(shifted), dtype=int)
+    for i in range(len(shifted)):
+        dc = izracunaj_razdaljo(shifted[i], centri)
+        labels[i] = np.argmin(dc)
+
+    out = centri[labels, C].reshape(M, N, C).astype(np.uint8)
+    return out
 
 def izracunaj_centre(slika, izbira, dimenzija_centra, T):
     '''Izračuna centre za metodo kmeans.'''
@@ -211,8 +229,11 @@ def izracunaj_centre(slika, izbira, dimenzija_centra, T):
 if __name__ == "__main__":
     slika = cv.imread('.utils/zelenjava.jpg')
 
-    rezultat = kmeans(slika, k=3, iteracije=10)
-    cv.imshow('Segmentirana slika', rezultat)
+    #kmeans_alg = kmeans(slika, k=3, iteracije=10)
+    #cv.imshow('kmeans', kmeans_alg)
+
+    meanshift_alg = meanshift(slika, 30.0, 3)
+    cv.imshow('mean-shift', meanshift_alg)
     cv.waitKey(0)
     cv.destroyAllWindows()
     pass
