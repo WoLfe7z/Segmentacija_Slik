@@ -13,22 +13,22 @@ def kmeans(slika, k=3, iteracije=10):
     #Oznaka klastra za vsak piksel
     oznake = np.zeros(st_pix, dtype=int)
 
+    dimenzija = 3
+    izbira = 0
     #Izracunanje centrov
-    centri = izracunaj_centre(slika, 1, k, 50.0)
+    centri = izracunaj_centre(slika, izbira, dimenzija, 50.0)
+
+    if(dimenzija == 5):
+        idx = np.arange(pixels.shape[0])
+        x = idx % N
+        y = idx // N
+        coords = np.stack([x, y], axis=1).astype(float)
+        pixels = np.hstack((pixels, coords))
 
     #Iteracija K-Means
     for it in range(iteracije): 
-        #Matrika razdalj velikosti N*k
-        razdalje = np.zeros((st_pix, k), dtype=float)
-        #Za vsak center
-        for j in range(k):
-            #Za vsak piksel
-            for i in range(st_pix):
-                #Vektorska razlika med pikslom in centrom
-                diff = pixels[i] - centri[j]
-
-                #Evklidska razdalja
-                razdalje[i, j] = np.sqrt(pow(diff[0], 2) + pow(diff[1], 2) + pow(diff[2], 2))
+        #Vektoriziran izracun razdalj med vsakim pikslom in vsakim centrom
+        razdalje = np.linalg.norm(pixels[:, None, :] - centri[None, :, :], axis=2)
         
         #Najblizji center za vsak piksel
         nove = np.argmin(razdalje, axis=1)
@@ -36,8 +36,8 @@ def kmeans(slika, k=3, iteracije=10):
         #Ce ni prislo do spremembe, preskocimo, drugace posodobimo oznake klastrov
         if np.array_equal(oznake, nove):
             break
-        else:
-            oznake = nove
+
+        oznake = nove
 
         #Posodobitev centrov kot povprecje pikslov v vsakem klastru
         for j in range(k):
@@ -51,21 +51,36 @@ def kmeans(slika, k=3, iteracije=10):
     
     #Rekonstrukcija slike
     out = centri[oznake]
-    slika_out = out.reshape(M, N, 3).astype(np.uint8)
+    slika_out = out[:, :3].reshape(M, N, 3).astype(np.uint8)
     return slika_out
+
+#Funkcija za izracun razdalje med dvema tockama
+def izracunaj_razdaljo(x, oznake):
+    #Izracuna in vrne razdalje med tocko x in vsako tocko v oznakah
+    return np.linalg.norm(oznake - x, axis=1)
+
+#Funkcija za izracun gaussovega jedra
+def gaussovo_jedro(d, h):
+    return np.exp(-(pow(d, 2) / (2 * pow(h, 2))))
+
+#Funkcija za preverjanje konvergence
+def preveri_konvergenco(x_new, x, eps):
+    #Preveri, ce je premik tocke manj kot eps
+    return np.linalg.norm(x_new - x) < eps
 
 def meanshift(slika, velikost_okna, dimenzija):
     '''Izvede segmentacijo slike z uporabo metode mean-shift.'''
-    pass
+    #Parametri
+    max_iter = 5    #Max iteracij za vsak piksel
+    eps = 1e-3      #Prag za konvergenco
+    min_cd = 10.0   #Pogoj za zdruzevanje centrov
 
-def izracunaj_centre(slika, izbira, dimenzija_centra, T):
-    '''Izračuna centre za metodo kmeans.'''
-    #Prebere dimenzije slike in pripracimo vektor
+    #Prebere dimenzije slike in pripravimo vektor
     M, N, C = slika.shape
-    pixels = slika.reshape(-1, C).astype(float)  
+    pixels = slika.reshape(-1, C).astype(float)     # (h*w, c)
 
-    #Ce je dimenzija_centra = 3, upostevamo barvo, ce ne potem upostevamo lokacije centrov in barve
-    if(dimenzija_centra == 3):
+    #Ce je dimenzija = 3, upostevamo samo barvo, ce ne potem upostevamo lokacije centrov in barve
+    if(dimenzija == 3):
         #Samo barve (M*N, C)
         oznake = pixels
     else:
@@ -80,7 +95,70 @@ def izracunaj_centre(slika, izbira, dimenzija_centra, T):
         y = idx // N
 
         coords = np.stack([x, y], axis=1).astype(float)
-        oznake = np.hstack(pixels, coords)
+        oznake = np.hstack((pixels, coords))
+
+    shifted = np.zeros_like(oznake)
+    #Za vsak piksel v vektorju oznake
+    for i in range(len(oznake)):
+        x = oznake[i]
+        iteracija = 0
+        konvergenca = False
+        while not konvergenca and iteracija < max_iter:
+            #Izracun razdalj
+            razdalje = izracunaj_razdaljo(x, oznake)
+
+            #Utezi z jedrom
+            utezi = gaussovo_jedro(razdalje, velikost_okna)
+
+            #Nova tocka sum(utezi * tocke) / sum(utezi)
+            x_new = (utezi[:, None] * oznake).sum(axis=0) / utezi.sum()
+
+            #Preveri konvergenco med tockami
+            konvergenca = preveri_konvergenco(x_new, x, eps)
+            x = x_new
+            iteracija += 1
+        shifted[i] = x
+
+    #Zdruzi konvergirane tocke v centre
+    centri = []
+    for x in shifted:
+        if not centri:
+            centri.append(x)
+        else:
+            dc = izracunaj_razdaljo(x, np.array(centri))
+            if min(dc) >= min_cd:
+                centri.append(x)
+    
+    centri = np.array(centri)
+
+    #Dodeli vsako tocko shifted tocku najblizjemu centru
+    labels = np.zeros(len(shifted), dtype=int)
+    for i in range(len(shifted)):
+        dc = izracunaj_razdaljo(shifted[i], centri)
+        labels[i] = np.argmin(dc)
+
+    seg_pixels = centri[labels]
+    seg_pixels = seg_pixels.reshape(M, N, centri.shape[1])
+    out = seg_pixels[:, :, :C].astype(np.uint8)
+    return out
+
+def izracunaj_centre(slika, izbira, dimenzija_centra, T):
+    '''Izračuna centre za metodo kmeans.'''
+    #Prebere dimenzije slike in pripravimo vektor
+    M, N, C = slika.shape
+    pixels = slika.reshape(-1, C).astype(float)  
+
+    #Ce je dimenzija_centra = 3, upostevamo samo barvo, ce ne potem upostevamo lokacije centrov in barve
+    if(dimenzija_centra == 3):
+        #Samo barve (M*N, C)
+        oznake = pixels.copy()
+    else:
+        #Dodamo prostorske koordinate x, y
+        idx = np.arange(pixels.shape[0])
+        x = (idx % N)
+        y = (idx // N)
+        coords = np.stack((x, y), axis=1) 
+        oznake = np.hstack((pixels, coords))
 
     #Stevilo centrov
     k = dimenzija_centra
@@ -95,20 +173,14 @@ def izracunaj_centre(slika, izbira, dimenzija_centra, T):
 
         #Nato izbiramo dokler nimamo k centrov
         while len(centri) < k:
-            idx = np.random.randint(len(oznake))
-            #Random novi center
-            nov = oznake[idx]
-            #Racunanje razdalje do vseh izbranih centrov
-            razdalje = []
+            nov = oznake[np.random.randint(len(oznake))]
 
-            for c in centri:
-                diff = nov - c
-                #Evklidksa razdalja
-                razdalje_val = np.sqrt(pow(diff[0], 2) + pow(diff[1], 2) + pow(diff[2], 2))
-                razdalje.append(razdalje_val)
-                
-                if min(razdalje) >= T:
-                    centri.append(nov)
+            #Evklidska razdalja random tocke do centrov
+            razdalje = np.linalg.norm(np.array(centri) - nov, axis=1)
+
+            #Dodamo nov center, ce je dovolj oddaljen od vseh
+            if min(razdalje) >= T:
+                centri.append(nov)
 
         return np.array(centri)
     #Rocno
@@ -142,9 +214,15 @@ def izracunaj_centre(slika, izbira, dimenzija_centra, T):
 
 if __name__ == "__main__":
     slika = cv.imread('.utils/zelenjava.jpg')
+    slika = cv.resize(slika, (800, 800))
 
-    rezultat = kmeans(slika, k=3, iteracije=10)
-    cv.imshow('Segmentirana slika', rezultat)
+    kmeans_alg = kmeans(slika, k=3, iteracije=10)
+    cv.imshow('kmeans', kmeans_alg)
+
+    #meanshift_alg = meanshift(slika, 80.0, 3)
+    #cv.imshow('mean-shift', meanshift_alg)
+    #cv.imshow('slika', slika)
+
     cv.waitKey(0)
     cv.destroyAllWindows()
     pass
