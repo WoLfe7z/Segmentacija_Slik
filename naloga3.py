@@ -27,17 +27,8 @@ def kmeans(slika, k=3, iteracije=10):
 
     #Iteracija K-Means
     for it in range(iteracije): 
-        #Matrika razdalj velikosti N*k
-        razdalje = np.zeros((st_pix, k), dtype=float)
-        #Za vsak center
-        for j in range(k):
-            #Za vsak piksel
-            for i in range(st_pix):
-                #Vektorska razlika med pikslom in centrom
-                diff = pixels[i] - centri[j]
-
-                #Evklidska razdalja
-                razdalje[i, j] = np.sqrt(pow(diff[0], 2) + pow(diff[1], 2) + pow(diff[2], 2))
+        #Vektoriziran izracun razdalj med vsakim pikslom in vsakim centrom
+        razdalje = np.linalg.norm(pixels[:, None, :] - centri[None, :, :], axis=2)
         
         #Najblizji center za vsak piksel
         nove = np.argmin(razdalje, axis=1)
@@ -45,8 +36,8 @@ def kmeans(slika, k=3, iteracije=10):
         #Ce ni prislo do spremembe, preskocimo, drugace posodobimo oznake klastrov
         if np.array_equal(oznake, nove):
             break
-        else:
-            oznake = nove
+
+        oznake = nove
 
         #Posodobitev centrov kot povprecje pikslov v vsakem klastru
         for j in range(k):
@@ -160,19 +151,13 @@ def izracunaj_centre(slika, izbira, dimenzija_centra, T):
     #Ce je dimenzija_centra = 3, upostevamo samo barvo, ce ne potem upostevamo lokacije centrov in barve
     if(dimenzija_centra == 3):
         #Samo barve (M*N, C)
-        oznake = pixels
+        oznake = pixels.copy()
     else:
-        #Izracunamo x in y za vsak piksel
-        #Oznaka za vsako vrsto od 0 do M*N-1
+        #Dodamo prostorske koordinate x, y
         idx = np.arange(pixels.shape[0])
-
-        #Stolpec, 
-        x = idx % N
-
-        #Vrsica, 
-        y = idx // N
-
-        coords = np.stack([x, y], axis=1).astype(float)
+        x = (idx % N)
+        y = (idx // N)
+        coords = np.stack((x, y), axis=1) 
         oznake = np.hstack((pixels, coords))
 
     #Stevilo centrov
@@ -188,21 +173,14 @@ def izracunaj_centre(slika, izbira, dimenzija_centra, T):
 
         #Nato izbiramo dokler nimamo k centrov
         while len(centri) < k:
-            idx = np.random.randint(len(oznake))
-            print(idx)
-            #Random novi center
-            nov = oznake[idx]
-            #Racunanje razdalje do vseh izbranih centrov
-            razdalje = []
+            nov = oznake[np.random.randint(len(oznake))]
 
-            for c in centri:
-                diff = nov - c
-                #Evklidksa razdalja
-                razdalje_val = np.sqrt(pow(diff[0], 2) + pow(diff[1], 2) + pow(diff[2], 2))
-                razdalje.append(razdalje_val)
-                
-                if min(razdalje) >= T:
-                    centri.append(nov)
+            #Evklidska razdalja random tocke do centrov
+            razdalje = np.linalg.norm(np.array(centri) - nov, axis=1)
+
+            #Dodamo nov center, ce je dovolj oddaljen od vseh
+            if min(razdalje) >= T:
+                centri.append(nov)
 
         return np.array(centri)
     #Rocno
