@@ -217,11 +217,13 @@ if __name__ == "__main__":
     slika = cv.imread('.utils/zelenjava.jpg')
     slika = cv.resize(slika, (200, 200))
 
+    #kmeans testiranje
     #kmeans_alg = kmeans(slika, 10, 10, 30.0, 3)
     #cv.imshow('kmeans_dim = 3', kmeans_alg)
     #kmeans_alg1 = kmeans(slika, 10, 10, 30.0, 5)
     #cv.imshow('kmeans_dim = 5', kmeans_alg1)
 
+    #mean-shift testiranje
     #meanshift_alg10 = meanshift(slika, 50.0, 5, 10.0)
     #cv.imshow('mean-shift_10', meanshift_alg10)
     #meanshift_alg20 = meanshift(slika, 50.0, 5, 50.0)
